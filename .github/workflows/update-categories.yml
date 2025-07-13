@@ -1,53 +1,58 @@
-# ADD THIS AT THE VERY TOP OF YOUR WORKFLOW FILE
-permissions:
-  contents: write    # allow pushing changes
-
+# .github/workflows/update-categories.yml
 name: 🔄 Update blog categories
 
 on:
   schedule:
-    - cron: '0 0 * * *'
+    - cron: '0 0 * * *'      # every day at midnight UTC
   push:
-    branches: [ main ]
+    branches: [ main ]      # also on manual pushes
 
 jobs:
   update-data:
     runs-on: ubuntu-latest
+
     steps:
+      # 1) Checkout the repo using your PAT so pushes will authenticate
       - name: Checkout code
         uses: actions/checkout@v3
         with:
+          token: ${{ secrets.PAT }}
           persist-credentials: true
           fetch-depth: 0
 
+      # 2) Ensure the _data directory exists
       - name: Prepare data directory
         run: mkdir -p _data
 
+      # 3) Install jq for JSON filtering
       - name: Install jq
         run: |
           sudo apt-get update
           sudo apt-get install -y jq
 
+      # 4) Fetch all your repos (including topics via preview header),
+      #    filter by blog-category, and output name/URL/description
       - name: Fetch blog-category repos
         env:
-          TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PAT: ${{ secrets.PAT }}
         run: |
           curl -s \
-            -H "Authorization: Bearer $TOKEN" \
+            -H "Authorization: token $PAT" \
             -H "Accept: application/vnd.github.mercy-preview+json" \
             "https://api.github.com/users/${{ github.repository_owner }}/repos?per_page=100" \
-          | jq '[ .[]
-                  | select(.topics | index("blog-category"))
+          | jq '[.[] 
+                  | select(.topics | index("blog-category")) 
                   | { name, html_url, description }
                 ]' \
           > _data/repos.json
 
+      # 5) Commit & push only if _data/repos.json has changed
       - name: Commit & push if changed
         run: |
           git config user.name  "github-actions[bot]"
           git config user.email "actions@github.com"
           if git diff --quiet _data/repos.json; then
-            echo "🟢 No changes detected, skipping commit."
+            echo "🟢 No change in blog categories—skipping commit."
             exit 0
           fi
           git add _data/repos.json
