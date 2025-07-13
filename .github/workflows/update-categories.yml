@@ -1,34 +1,33 @@
+# ADD THIS AT THE VERY TOP OF YOUR WORKFLOW FILE
+permissions:
+  contents: write    # allow pushing changes
+
 name: 🔄 Update blog categories
 
 on:
   schedule:
-    - cron: '0 0 * * *'    # daily @ 00:00 UTC
+    - cron: '0 0 * * *'
   push:
     branches: [ main ]
 
 jobs:
   update-data:
     runs-on: ubuntu-latest
-
     steps:
-      # 1) Get the code with credentials so we can push back
       - name: Checkout code
         uses: actions/checkout@v3
         with:
-          persist-credentials: true   # allows the GITHUB_TOKEN to push
-          fetch-depth: 0             # get full history
+          persist-credentials: true
+          fetch-depth: 0
 
-      # 2) Ensure _data/ exists
       - name: Prepare data directory
         run: mkdir -p _data
 
-      # 3) Install jq for JSON parsing
       - name: Install jq
         run: |
           sudo apt-get update
           sudo apt-get install -y jq
 
-      # 4) Fetch and filter your repos by topic
       - name: Fetch blog-category repos
         env:
           TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -43,7 +42,6 @@ jobs:
                 ]' \
           > _data/repos.json
 
-      # 5) Commit & push only if that file changed
       - name: Commit & push if changed
         run: |
           git config user.name  "github-actions[bot]"
